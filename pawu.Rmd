@@ -1,0 +1,145 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Roxana Trejos Ramírez"
+date: "12/18/2020"
+output: html_document
+---
+
+This project will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
+
+GOAL: Predict the manner in which they did the exercise. 
+
+-  This is the "classe" variable in the training set. 
+-  Use any of the other variables to predict with. 
+
+This report is describing:
+
+-  How you built your model
+-  How you used cross validation
+-  What you think the expected out of sample error is
+-  Why you made the choices you did. 
+-  Use prediction model to predict 20 different test cases
+
+#  LOADING PACKAGES AND LIBRARIES
+```{r message=FALSE, warning=FALSE}
+    library(ggplot2)
+    #  A set of functions that attempt to streamline the process for creating predictive models.
+    library(caret)
+    #  Automated Feature Selection from 'caret'
+    library(fscaret)
+    #  Implements Breiman's random forest algorithm (based on Breiman and Cutler's original Fortran code) for classification and                                  
+    #  regression. It can also be used in unsupervised mode for assessing proximities among data points.
+    library(randomForest) 
+    #  Functions for latent class analysis, short time Fourier transform, fuzzy clustering, support vector machines, shortest path                                
+    #  computation, bagged clustering, naive Bayes classifier, etc.
+    library(e1071)         
+```
+
+# READING DATA
+```{r}
+    # Loading training data from the csv file.
+    url_train <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+    download.file(url_train, destfile = "pml-training.csv")
+    training <- read.table("pml-training.csv", sep = ",", header = TRUE)
+    
+    # Loading testing data from the csv file.
+    url_test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+    download.file(url_test, destfile = "pml-testing.csv")
+    testing <- read.table("pml-testing.csv", sep = ",", header = TRUE)
+```
+
+# SPLITTING THE DATA AND SELECTING FEATURES
+Create two partitions (80% and 20%) within the original training dataset.
+```{r}
+    #  Seed to make the analysis reproducible
+    set.seed(1000) 
+
+    #  Partitioning the training set into training 
+    #  Data splitting functions
+    #  A series of training partitions are created
+    #  y = training$clase
+    inTrain <- createDataPartition(y=training$classe, 
+                                   p=0.8, 
+                                   list=F)
+    
+    # inTraining = A list or matrix of row position integers corresponding to the training data. 
+    
+    
+    # Splitting the original training set into the training set and a validation set.
+    training1 <- training[inTrain, ]
+    training2 <- training[-inTrain, ]
+```
+## CLEANING TRAINING 1 AND 2
+1.  The two datasets (train_set and test_set) have a large number of NA values as well as near-zero-variance (NZV) variables. Both will be removed together with their ID variables.
+2.  Remove variables that are mostly NA.
+3.  Since columns 1 to 5 are identification variables only, they will be removed as well.
+```{r}
+    # Removing Near Zero Variance Predictors
+    nzv <- nearZeroVar(training)
+    training1 <- training1[, -nzv]
+    training2 <- training2[, -nzv]
+    
+    # Removing Predictors with NA values
+    training1 <- training1[, colSums(is.na(training1)) == 0]
+    training2 <- training2[, colSums(is.na(training2)) == 0]
+    
+    # Removing columns unfit for prediction the cols:  ID, user_name, raw_timestamp_part_1 etc ...
+    training1 <- training1[, -(1:5)]
+    training2 <- training2[, -(1:5)]
+```
+
+
+Quick exploration of the data (testing and training) to see if there is something in the data that might  affect the model decision.
+Checking which column names are common among testing and training, so we can exclude the ones who are not common. 
+Checking the classe balance in the training set to see whether there is anything in particular we should be concerned with. 
+Plotting the classe variable against the first 5 (example exploratory plot).
+```{r message=FALSE, warning=FALSE}
+    length(intersect(colnames(training),colnames(testing)))
+    barplot(table(training$classe))
+    splom(classe~training[1:5], data = training)
+```
+Conclusion:  
+
+-  159 variables in common, everyone except classe
+-  Target variable is balanced across the different classes
+
+
+## MODELING DATA WITH RANDOM FOREST
+Fitting  Predictive Models Over Different Tuning Parameters
+This function sets up a grid of tuning parameters for a number of classification and regression routines, fits each model and calculates a resampling based performance measure.
+rf = Random Forest Model.  This is one of the best model since it provides the most accurate results. 
+The cross-validation is set to draw a subset of the data three different times.
+```{r}
+    modelo <- train(classe ~., 
+                  method = "rf", 
+                  data = training1, 
+                  verbose = TRUE, 
+                  trControl = trainControl(method="cv"), 
+                  number = 3)
+```
+
+##  Predictions of the random forest model on TRAINING 1
+```{r}
+    pred1 <- predict(modelo, training1)
+    confusionMatrix(pred1, factor(training1$classe))
+```
+
+##  Predictions of the random forest model on TRAINING 2
+```{r}
+    pred2 <- predict(modelo, training2)
+    confusionMatrix(pred2, factor(training2$classe))
+```
+
+# CLEANING TESTING DATA
+```{r}
+    testing <- testing[, colSums(is.na(testing)) == 0]
+    testing <- testing[, -(1:5)]
+    nzvt <- nearZeroVar(testing)
+    testing <- testing[, -nzvt]
+```
+
+#  TESTING RANDOM FOREST MODEL WITH TESTING DATA (20 different test cases)
+```{r}
+    pred3 <- predict(modelo, testing)
+    pred3
+```
