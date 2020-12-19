@@ -2,7 +2,9 @@
 title: "Prediction Assignment Writeup"
 author: "Roxana Trejos Ramírez"
 date: "12/18/2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 This project will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants.
